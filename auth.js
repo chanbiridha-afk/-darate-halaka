@@ -12,8 +12,15 @@ import { firebaseConfig } from "./firebase-init.js";
 export function watchAuth(cb){
   return onAuthStateChanged(auth, async (user)=>{
     if(!user){ cb(null); return; }
-    const udoc = await getDoc(doc(db,"users",user.uid));
-    cb({ uid:user.uid, email:user.email, profile: udoc.exists()? udoc.data() : null });
+    // إعادة محاولة قصيرة لقراءة وثيقة الدور، لتفادي تسابق التوقيت مباشرة بعد إنشاء الحساب
+    // (لحظة إنشاء المستخدم في نظام المصادقة تسبق أحيانًا اكتمال كتابة وثيقة الدور في Firestore)
+    let profile = null;
+    for(let attempt=0; attempt<6; attempt++){
+      const udoc = await getDoc(doc(db,"users",user.uid));
+      if(udoc.exists()){ profile = udoc.data(); break; }
+      await new Promise(r=>setTimeout(r, 400));
+    }
+    cb({ uid:user.uid, email:user.email, profile });
   });
 }
 

@@ -612,6 +612,8 @@ async function initApp(){
     }
     currentUser = user;
     if(!user.profile){
+      authError = "تعذّر تحميل بيانات حسابك. إذا أنشأتم الحساب للتو، انتظروا لحظة ثم أعيدوا المحاولة. إن تكرر الأمر تواصلوا مع إدارة المدرسة.";
+      authMode = "login";
       await AuthApi.logout();
       return;
     }
