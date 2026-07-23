@@ -668,6 +668,7 @@ const NAV_STAFF = [
   {view:"payments", label:"الاشتراكات", roles:["admin"]},
   {view:"reports", label:"التقارير", roles:["admin","teacher"]},
   {view:"stats", label:"الإحصائيات", roles:["admin","teacher"]},
+  {view:"backup", label:"النسخ الاحتياطي", roles:["admin"]},
 ];
 
 function buildNav(){
@@ -703,7 +704,7 @@ function switchView(v){ currentView = v; render(); }
 
 // ===================== واجهة الطاقم (مدير/معلّم) =====================
 function renderStaffApp(root){
-  const adminOnly = ["groups","years","teachers","payments"];
+  const adminOnly = ["groups","years","teachers","payments","backup"];
   if(adminOnly.includes(currentView) && !isAdmin()){
     root.innerHTML = `<div class="card"><div class="empty"><div class="big">🔒</div>هذه الصفحة مخصّصة للمدير الإداري فقط.</div></div>`;
     return;
@@ -730,6 +731,7 @@ function renderStaffApp(root){
   if(currentView==="payments") return renderPayments(root);
   if(currentView==="reports") return renderReports(root);
   if(currentView==="stats") return renderStats(root);
+  if(currentView==="backup") return renderBackup(root);
   root.innerHTML = `<div class="card">صفحة غير معروفة</div>`;
 }
 
@@ -1521,6 +1523,56 @@ function renderReports(root){
       : `<div class="empty">لا توجد نتائج مسجّلة بعد.</div>`}
     </div>
   `;
+}
+
+// ===================== النسخ الاحتياطي =====================
+function renderBackup(root){
+  const counts = {
+    "السنوات الدراسية": Store.DB.years.length,
+    "الأفواج": Store.DB.groups.length,
+    "المتعلّمون": Store.DB.students.length,
+    "الجلسات": Store.DB.sessions.length,
+    "الاختبارات والفروض": Store.DB.exams.length,
+    "الاشتراكات": Store.DB.payments.length,
+    "حسابات المعلّمين": (Store.DB.teachers||[]).length,
+  };
+  root.innerHTML = `
+    <div class="card">
+      <h3><span class="dot"></span> تنزيل نسخة احتياطية</h3>
+      <p class="small-note">تُصدَّر جميع بيانات المنصة (بما فيها السنوات، الأفواج، المتعلمون، الجلسات، الاختبارات، والاشتراكات) في ملف JSON واحد يمكن حفظه على جهازكم كنسخة احتياطية إضافية، بما أن البيانات أصلًا مُزامنة سحابيًا بشكل دائم عبر Firebase.</p>
+      <div class="grid g3" style="margin-top:14px">
+        ${Object.entries(counts).map(([label,n])=>`
+          <div class="card stat-card" style="box-shadow:none;border:1px solid var(--line)">
+            <div class="stat-num">${n}</div><div class="stat-lbl">${label}</div>
+          </div>`).join('')}
+      </div>
+      <button class="btn btn-primary" style="margin-top:16px" onclick="exportBackup()">⬇️ تنزيل النسخة الاحتياطية (JSON)</button>
+      <p class="small-note" style="margin-top:10px">هذا الملف للتصدير والاطّلاع فقط في هذه النسخة، ولا يمكن استيراده مباشرة إلى المنصة. لأي استعادة فعلية للبيانات تواصلوا معنا.</p>
+    </div>
+  `;
+}
+function exportBackup(){
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    school: "المدرسة النموذجية النهضة بالقرآن الكريم",
+    years: Store.DB.years,
+    groups: Store.DB.groups,
+    students: Store.DB.students,
+    sessions: Store.DB.sessions,
+    exams: Store.DB.exams,
+    payments: Store.DB.payments,
+    teachers: (Store.DB.teachers||[]).map(t=>({id:t.id, name:t.name, email:t.email, assignedGroupIds:t.assignedGroupIds||[]})),
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `halaqa-backup-${todayStr()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast("تم تنزيل النسخة الاحتياطية");
 }
 
 // ===================== الإحصائيات =====================
